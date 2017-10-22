@@ -34,8 +34,8 @@ I wanted to see how much I can fit inside the 1K program memory of the ATtiny13A
 
 
 Prototype:
-[Image of Yaktocat](https://octodex.github.com/images/yaktocat.png)
-
+![Prototype](https://octodex.github.com/images/yaktocat.png)
+[Video](https://photos.app.goo.gl/yZkzm7XO45P768l03)
 
 
 
