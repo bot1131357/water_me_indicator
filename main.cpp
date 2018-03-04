@@ -3,6 +3,7 @@
  *
  * Created: 10/22/2017 12:39:23 PM
  * Author : y.tan
+ * Reference copy only. Modify from the original instead..
  */ 
  
 
@@ -136,7 +137,7 @@ void WDT_enableInterrupt(uint8_t timeout){
  }
 
  /** 
-  * Indicates different colous from red (0) to green (humidity_hi) 
+  * Indicates different colours from red (0) to green (humidity_hi) 
   * Ideally we want to display blue if the value to significantly higher than 
   * humidity_hi but 1K program memory...
   */
@@ -149,8 +150,8 @@ void WDT_enableInterrupt(uint8_t timeout){
 		humidity=humidity<<8;
 		humidity/=humidity_hi;	
 		humidity = (humidity<0xff)?humidity:0xff;
-		OCR0A = humidity;
-		OCR0B = 0xff-humidity;
+		OCR0B = humidity;
+		OCR0A = 0xff-humidity;
 
 	_delay_ms(500);
 
@@ -231,15 +232,15 @@ int main(void)
 	// If button is pressed, enter calibrate mode
 	if(!(PORT_BUTTON & _BV(PIN_BUTTON)))
 	{
-		OCR0B = LED_DIM_VAL;
 		OCR0A = LED_DIM_VAL;
+		OCR0B = LED_DIM_VAL;
 		_delay_ms(50);
 		while(!(PORT_BUTTON & _BV(PIN_BUTTON))){}
 
 		wait_for_button_press([](){
 			_delay_ms(100);
-			OCR0A = (OCR0A>0)? 0:LED_DIM_VAL;
 			OCR0B = (OCR0B>0)? 0:LED_DIM_VAL;
+			OCR0A = (OCR0A>0)? 0:LED_DIM_VAL;
 		});
 
 		// Get humid value
@@ -250,10 +251,10 @@ int main(void)
 	}
 
 	// Indicate ready to be left alone
-	OCR0A = LED_DIM_VAL;
-	OCR0B = 0;
-	_delay_ms(1000);
+	OCR0B = LED_DIM_VAL;
 	OCR0A = 0;
+	_delay_ms(1000);
+	OCR0B = 0;
 
 	// Set button interrupt	
 	GIMSK |= _BV(PCIE);	// Enable pin change (rise/fall) interrupt
@@ -289,6 +290,7 @@ ISR(PCINT0_vect)
 		indicateHumidity(measure_soil_humidity());
 	}
 
+	wdt_reset(); // no need to indicate again since we've already pressed the button
 	GIFR |= _BV(PCIF); // clear flag
 }
 #endif // PRODUCTION
