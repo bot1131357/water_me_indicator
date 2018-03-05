@@ -34,6 +34,7 @@ I wanted to see how much I can fit inside the 1K program memory of the ATtiny13A
 
 
 Prototype:
+![Schematic](https://github.com/bot1131357/water_me_indicator/blob/master/schematic.jpg)
 ![Prototype](https://github.com/bot1131357/water_me_indicator/blob/master/prototype.jpg)
 [Video](https://photos.app.goo.gl/yZkzm7XO45P768l03)
 
