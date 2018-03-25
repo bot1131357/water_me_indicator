@@ -3,7 +3,6 @@
  *
  * Created: 10/22/2017 12:39:23 PM
  * Author : y.tan
- * Reference copy only. Modify from the original instead..
  */ 
  
 
@@ -48,6 +47,8 @@
 
 
 /** 
+ * NOTE: MCU Fuse128kHz, SUT:: 14CK + 64ms, preserve EEPROM (fuse value: 0xff, 0x3b)
+ *
  * Directions
  * First time (calibration)
  * 1) Press and hold button while powering up. 
@@ -74,7 +75,91 @@
   */
  #define NB_WDTIE_NORMAL 75 // 75 * 8 s = 10 minutes
  #define NB_WDTIE_NORMAL 2 // TESTING
- #define NB_WDTIE_WARNING 1 // 8 s
+ #define NB_WDTIE_WARNING 3 // 2 s (no prescale)
+ uint8_t WDT_interval = NB_WDTIE_NORMAL;
+
+/** 
+ * Sanity check: Values should never be equal because it's used to identify and 
+ * switch between normal and warning states.
+ */
+#if (NB_WDTIE_NORMAL==NB_WDTIE_W/*
+ * ATtiny13A_soil_test_v1.cpp
+ *
+ * Created: 10/22/2017 12:39:23 PM
+ * Author : y.tan
+ */ 
+ 
+
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <avr/power.h>
+#include <avr/sleep.h>
+#include <avr/pgmspace.h>
+#include <avr/wdt.h>
+#include <avr/eeprom.h>
+
+// Set ISP speed to 25kHz to communicate with 128kHz device
+ #define F_CPU 128000L
+ #include <util/delay.h>
+
+// RESET BUTTON - unless you don't want to program this device anymore
+//#define DDR_LED_B DDRB
+//#define PORT_LED_B PORTB
+//#define PIN_LED_B PORTB5
+#define DDR_LED_R DDRB
+#define PORT_LED_R PORTB
+#define PIN_LED_R PORTB1
+
+#define DDR_LED_G DDRB
+#define PORT_LED_G PORTB
+#define PIN_LED_G PORTB0
+
+#define DDR_SENSOR_PWR DDRB
+#define PORT_SENSOR_PWR PORTB
+#define PIN_SENSOR_PWR PORTB4
+
+#define DDR_BUTTON DDRB
+#define PORT_BUTTON PINB
+#define PIN_BUTTON PINB2
+#define PCINT_BUTTON PCINT2
+
+#define DDR_SENSOR_AIN DDRB
+#define PORT_SENSOR_AIN PINB
+#define PIN_SENSOR_AIN PINB3
+
+#define MAX_LED_BRIGHTNESS 200 
+
+
+/** 
+ * NOTE: MCU Fuse128kHz, SUT:: 14CK + 64ms, preserve EEPROM (fuse value: 0xff, 0x3b)
+ *
+ * Directions
+ * First time (calibration)
+ * 1) Press and hold button while powering up. 
+ * 2) Release button when LED is red. (LED starts blinking.)
+ * 3) Water the soil to the right level.
+ * 4) Insert sensor into soil with right moisture level
+ * 5) Press the button (LED stops blinking, and turns green.)
+ * 6) From then on, the sensor will check the humidity level every 10 min
+ * 
+ * Check moisture level
+ * 1) Press button.
+ * 2) Light shows moisture level (Red = dry, Yellow = medium, Green = ok)
+ *
+ */
+
+ /** 
+  * Watchdog's longest interval is 8 seconds. We want to spend more time sleeping
+  * between measurements, so we will add a countdown variable. 
+  * Every time ATtiny13A wakes up, we will decrement the variable.
+  * When it's zero, we take a measurement.
+  * 
+  * If the soil is found to be dry, we can change the countdown to a shorter value
+  * to make it blink.
+  */
+ #define NB_WDTIE_NORMAL 75 // 75 * 8 s = 10 minutes
+ #define NB_WDTIE_NORMAL 2 // TESTING
+ #define NB_WDTIE_WARNING 3 // 2 s (no prescale)
  uint8_t WDT_interval = NB_WDTIE_NORMAL;
 
 /** 
@@ -86,7 +171,7 @@
 #endif
 
 // Taking multiple measurements gives a more averaged value 
-#define nb_measures 8
+#define nb_measures 4
 
 volatile uint16_t humidity_hi = 100<<nb_measures;
 #define LED_DIM_VAL 50 // OCR value for dim brightness
@@ -147,13 +232,17 @@ void WDT_enableInterrupt(uint8_t timeout){
 
 	change_indicator_interval(humidity);
 
+		// scale relative humidity value to 0-255 range
 		humidity=humidity<<8;
 		humidity/=humidity_hi;	
-		humidity = (humidity<0xff)?humidity:0xff;
-		OCR0B = humidity;
-		OCR0A = 0xff-humidity;
 
-	_delay_ms(500);
+		// saturate at 255
+		humidity = (humidity<0xff)?humidity:0xff;
+
+		OCR0A = humidity;
+		OCR0B = 0xff-(humidity>>1);
+
+	_delay_ms(400);
 
 	TCCR0A &= ~(_BV(COM0A1) | _BV(COM0B1)); // disconnect PWM to pin
 	
@@ -204,6 +293,9 @@ void sleepNow(){
 #ifdef PRODUCTION
 int main(void)
 {
+	// disable WDT (NOT WORKING?)
+	//WDT_disableInterrupt();
+	
 	// Preferred mode of sleeping
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 
@@ -244,17 +336,17 @@ int main(void)
 		});
 
 		// Get humid value
-		humidity_hi=measure_soil_humidity();
+		humidity_hi = measure_soil_humidity();
 
 		// Store new humidity level
 		eeprom_write_word((uint16_t *)eeprom_humidity_hi, humidity_hi);
 	}
 
 	// Indicate ready to be left alone
-	OCR0B = LED_DIM_VAL;
-	OCR0A = 0;
-	_delay_ms(1000);
+	OCR0A = LED_DIM_VAL;
 	OCR0B = 0;
+	_delay_ms(1000);
+	OCR0A = 0;
 
 	// Set button interrupt	
 	GIMSK |= _BV(PCIE);	// Enable pin change (rise/fall) interrupt
