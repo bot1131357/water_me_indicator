@@ -9,7 +9,7 @@ Other components include:
 - Push button
 - RGB LED
 - Button cell and holder
-- 12 kohm resistor
+- Resistors: 12k, 3k, 1k
 
 I wanted to see how much I can fit inside the 1K program memory of the ATtiny13A. 
 

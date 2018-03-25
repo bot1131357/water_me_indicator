@@ -43,93 +43,6 @@
 #define PORT_SENSOR_AIN PINB
 #define PIN_SENSOR_AIN PINB3
 
-#define MAX_LED_BRIGHTNESS 200 
-
-
-/** 
- * NOTE: MCU Fuse128kHz, SUT:: 14CK + 64ms, preserve EEPROM (fuse value: 0xff, 0x3b)
- *
- * Directions
- * First time (calibration)
- * 1) Press and hold button while powering up. 
- * 2) Release button when LED is red. (LED starts blinking.)
- * 3) Water the soil to the right level.
- * 4) Insert sensor into soil with right moisture level
- * 5) Press the button (LED stops blinking, and turns green.)
- * 6) From then on, the sensor will check the humidity level every 10 min
- * 
- * Check moisture level
- * 1) Press button.
- * 2) Light shows moisture level (Red = dry, Yellow = medium, Green = ok)
- *
- */
-
- /** 
-  * Watchdog's longest interval is 8 seconds. We want to spend more time sleeping
-  * between measurements, so we will add a countdown variable. 
-  * Every time ATtiny13A wakes up, we will decrement the variable.
-  * When it's zero, we take a measurement.
-  * 
-  * If the soil is found to be dry, we can change the countdown to a shorter value
-  * to make it blink.
-  */
- #define NB_WDTIE_NORMAL 75 // 75 * 8 s = 10 minutes
- #define NB_WDTIE_NORMAL 2 // TESTING
- #define NB_WDTIE_WARNING 3 // 2 s (no prescale)
- uint8_t WDT_interval = NB_WDTIE_NORMAL;
-
-/** 
- * Sanity check: Values should never be equal because it's used to identify and 
- * switch between normal and warning states.
- */
-#if (NB_WDTIE_NORMAL==NB_WDTIE_W/*
- * ATtiny13A_soil_test_v1.cpp
- *
- * Created: 10/22/2017 12:39:23 PM
- * Author : y.tan
- */ 
- 
-
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <avr/power.h>
-#include <avr/sleep.h>
-#include <avr/pgmspace.h>
-#include <avr/wdt.h>
-#include <avr/eeprom.h>
-
-// Set ISP speed to 25kHz to communicate with 128kHz device
- #define F_CPU 128000L
- #include <util/delay.h>
-
-// RESET BUTTON - unless you don't want to program this device anymore
-//#define DDR_LED_B DDRB
-//#define PORT_LED_B PORTB
-//#define PIN_LED_B PORTB5
-#define DDR_LED_R DDRB
-#define PORT_LED_R PORTB
-#define PIN_LED_R PORTB1
-
-#define DDR_LED_G DDRB
-#define PORT_LED_G PORTB
-#define PIN_LED_G PORTB0
-
-#define DDR_SENSOR_PWR DDRB
-#define PORT_SENSOR_PWR PORTB
-#define PIN_SENSOR_PWR PORTB4
-
-#define DDR_BUTTON DDRB
-#define PORT_BUTTON PINB
-#define PIN_BUTTON PINB2
-#define PCINT_BUTTON PCINT2
-
-#define DDR_SENSOR_AIN DDRB
-#define PORT_SENSOR_AIN PINB
-#define PIN_SENSOR_AIN PINB3
-
-#define MAX_LED_BRIGHTNESS 200 
-
-
 /** 
  * NOTE: MCU Fuse128kHz, SUT:: 14CK + 64ms, preserve EEPROM (fuse value: 0xff, 0x3b)
  *
@@ -266,7 +179,8 @@ void wait_for_button_press(void (*cbfun)(void))
  */
 uint32_t measure_soil_humidity()
 {
-	PORT_SENSOR_PWR |= _BV(PIN_SENSOR_PWR); // power up
+	//PORT_SENSOR_PWR |= _BV(PIN_SENSOR_PWR); // power up
+	PORT_SENSOR_PWR &= ~_BV(PIN_SENSOR_PWR); // enable sensor current flow
 	ADCSRA |= _BV(ADSC); // start conversion
 	uint16_t val = 0;
 	for (int i=0;i<nb_measures;++i)
@@ -276,8 +190,9 @@ uint32_t measure_soil_humidity()
 		while(!(ADCSRA & _BV(ADSC))){}
 		val += ADCH;
 	}
-
-	PORT_SENSOR_PWR &= ~_BV(PIN_SENSOR_PWR); // power down
+	
+	//PORT_SENSOR_PWR &= ~_BV(PIN_SENSOR_PWR); // power down
+	PORT_SENSOR_PWR |= _BV(PIN_SENSOR_PWR); // stop sensor current flow
 	
 	//return val/nb_measures; // no need division for better resolution
 	return val;
@@ -299,7 +214,8 @@ int main(void)
 	// Preferred mode of sleeping
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 
-	DDR_SENSOR_PWR|=_BV(PIN_SENSOR_PWR);
+	DDR_SENSOR_PWR|=_BV(PIN_SENSOR_PWR);	
+	PORT_SENSOR_PWR |= _BV(PIN_SENSOR_PWR); // stop sensor current flow
 	DDR_LED_R |= _BV(PIN_LED_R);
 	DDR_LED_G |= _BV(PIN_LED_G);
 	DDR_BUTTON &= ~_BV(PIN_BUTTON);
